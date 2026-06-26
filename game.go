@@ -16,6 +16,7 @@ type Game struct {
 	Paused     bool
 	Ticker     *time.Ticker
 	Running    bool
+	NeedRender bool
 }
 
 const (
@@ -42,9 +43,14 @@ func NewGame() *Game {
 		GameOver:   false,
 		Paused:     false,
 		Running:    true,
+		NeedRender: true,
 	}
 	game.resetTicker()
 	return game
+}
+
+func (g *Game) MarkDirty() {
+	g.NeedRender = true
 }
 
 func (g *Game) IsGameOver() bool {
@@ -68,9 +74,16 @@ func (g *Game) CanTogglePause() bool {
 }
 
 func (g *Game) TogglePause() {
-	if g.CanTogglePause() {
-		g.Paused = !g.Paused
+	if !g.CanTogglePause() {
+		return
 	}
+	g.Paused = !g.Paused
+	if g.Paused {
+		g.Ticker.Stop()
+	} else {
+		g.resetTicker()
+	}
+	g.MarkDirty()
 }
 
 func (g *Game) resetTicker() {
@@ -95,6 +108,7 @@ func (g *Game) Restart() {
 	g.GameOver = false
 	g.Paused = false
 	g.resetTicker()
+	g.MarkDirty()
 }
 
 func (g *Game) updateSpeed() {
@@ -109,6 +123,7 @@ func (g *Game) HandleKey(e KeyEvent) {
 	switch e.Action {
 	case ActionQuit:
 		g.Running = false
+		g.MarkDirty()
 	case ActionRestart:
 		g.Restart()
 	case ActionPause:
@@ -116,6 +131,7 @@ func (g *Game) HandleKey(e KeyEvent) {
 	case ActionDir:
 		if g.CanChangeDirection() {
 			g.Snake.SetDirection(e.Direction)
+			g.MarkDirty()
 		}
 	}
 }
@@ -140,6 +156,7 @@ func (g *Game) Step() {
 		g.Food.Spawn(g.Snake, g.Obstacles)
 		g.updateSpeed()
 	}
+	g.MarkDirty()
 }
 
 func (g *Game) checkCollision(p Point) bool {
@@ -150,6 +167,7 @@ func (g *Game) endGame() {
 	g.GameOver = true
 	g.HighScore = UpdateHighScoreIfNeeded(g.Score, g.HighScore)
 	g.Ticker.Stop()
+	g.MarkDirty()
 }
 
 func (g *Game) PollInput() {
