@@ -27,6 +27,7 @@ const (
 	vkDown     = 0x28
 	vkLeft     = 0x25
 	vkRight    = 0x27
+	vkSpace    = 0x20
 	vkR        = 0x52
 	vkQ        = 0x51
 )
@@ -74,6 +75,7 @@ const (
 	ActionDir
 	ActionRestart
 	ActionQuit
+	ActionPause
 )
 
 type KeyEvent struct {
@@ -130,6 +132,8 @@ func ReadKeyEvent() KeyEvent {
 		return KeyEvent{Action: ActionDir, Direction: DirLeft}
 	case vkRight:
 		return KeyEvent{Action: ActionDir, Direction: DirRight}
+	case vkSpace:
+		return KeyEvent{Action: ActionPause}
 	case vkR:
 		return KeyEvent{Action: ActionRestart}
 	case vkQ:

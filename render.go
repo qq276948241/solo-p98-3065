@@ -96,7 +96,7 @@ func WriteString(s string) {
 	)
 }
 
-func Render(snake *Snake, food *Food, score, highScore, speedLevel int, gameOver bool) {
+func Render(snake *Snake, food *Food, obstacles Obstacles, score, highScore, speedLevel int, gameOver, paused bool) {
 	MoveCursor(0, 0)
 
 	var sb strings.Builder
@@ -126,6 +126,8 @@ func Render(snake *Snake, food *Food, score, highScore, speedLevel int, gameOver
 				ch = "o"
 			} else if x == food.Pos.X && y == food.Pos.Y {
 				ch = "*"
+			} else if obstacles.Has(Point{X: x, Y: y}) {
+				ch = "#"
 			}
 			sb.WriteString(ch)
 		}
@@ -144,8 +146,12 @@ func Render(snake *Snake, food *Food, score, highScore, speedLevel int, gameOver
 			sb.WriteString("速度档: Lv." + strconv.Itoa(speedLevel))
 		case 10:
 			sb.WriteString("↑ ↓ ← → 移动")
+		case 11:
+			sb.WriteString("空格 暂停/继续")
 		case 12:
 			sb.WriteString("R 重开  Q 退出")
+		case 14:
+			sb.WriteString("# 障碍物")
 		case 16:
 			if gameOver {
 				sb.WriteString("  ⚠ 游戏结束! ⚠")
@@ -162,5 +168,38 @@ func Render(snake *Snake, food *Food, score, highScore, speedLevel int, gameOver
 	sb.WriteString(topBorder)
 	sb.WriteString("   得分+10 / 食物\r\n")
 
-	WriteString(sb.String())
+	if paused {
+		pausedLine := MapHeight/2 - 1
+		padding := (MapWidth - len(" PAUSED ")) / 2
+		overlay := make([]string, 0, 3)
+		overlay = append(overlay, strings.Repeat(" ", padding)+"╔════════╗")
+		overlay = append(overlay, strings.Repeat(" ", padding)+"║ PAUSED ║")
+		overlay = append(overlay, strings.Repeat(" ", padding)+"╚════════╝")
+
+		lines := strings.Split(sb.String(), "\r\n")
+		for i, line := range overlay {
+			targetLine := pausedLine + i + 1
+			if targetLine >= 0 && targetLine < len(lines) {
+				old := lines[targetLine]
+				if len(old) >= MapWidth+2 {
+					border := old[:1]
+					end := old[MapWidth+1 : MapWidth+2]
+					rightInfo := ""
+					if len(old) > MapWidth+2 {
+						rightInfo = old[MapWidth+2:]
+					}
+					inner := line
+					if len(inner) < MapWidth {
+						inner = inner + strings.Repeat(" ", MapWidth-len(inner))
+					} else if len(inner) > MapWidth {
+						inner = inner[:MapWidth]
+					}
+					lines[targetLine] = border + inner + end + rightInfo
+				}
+			}
+		}
+		WriteString(strings.Join(lines, "\r\n"))
+	} else {
+		WriteString(sb.String())
+	}
 }

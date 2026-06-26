@@ -8,10 +8,12 @@ import (
 type Game struct {
 	Snake      *Snake
 	Food       *Food
+	Obstacles  Obstacles
 	Score      int
 	HighScore  int
 	SpeedLevel int
 	GameOver   bool
+	Paused     bool
 	Ticker     *time.Ticker
 	Running    bool
 }
@@ -26,16 +28,19 @@ const (
 func NewGame() *Game {
 	rand.Seed(time.Now().UnixNano())
 	snake := NewSnake()
+	obstacles := NewObstacles(snake)
 	food := NewFood()
-	food.Spawn(snake)
+	food.Spawn(snake, obstacles)
 	highScore := LoadHighScore()
 	game := &Game{
 		Snake:      snake,
 		Food:       food,
+		Obstacles:  obstacles,
 		Score:      0,
 		HighScore:  highScore,
 		SpeedLevel: 1,
 		GameOver:   false,
+		Paused:     false,
 		Running:    true,
 	}
 	game.resetTicker()
@@ -56,11 +61,13 @@ func (g *Game) resetTicker() {
 func (g *Game) Restart() {
 	rand.Seed(time.Now().UnixNano())
 	g.Snake = NewSnake()
+	g.Obstacles = NewObstacles(g.Snake)
 	g.Food = NewFood()
-	g.Food.Spawn(g.Snake)
+	g.Food.Spawn(g.Snake, g.Obstacles)
 	g.Score = 0
 	g.SpeedLevel = 1
 	g.GameOver = false
+	g.Paused = false
 	g.resetTicker()
 }
 
@@ -78,15 +85,19 @@ func (g *Game) HandleKey(e KeyEvent) {
 		g.Running = false
 	case ActionRestart:
 		g.Restart()
-	case ActionDir:
+	case ActionPause:
 		if !g.GameOver {
+			g.Paused = !g.Paused
+		}
+	case ActionDir:
+		if !g.GameOver && !g.Paused {
 			g.Snake.SetDirection(e.Direction)
 		}
 	}
 }
 
 func (g *Game) Step() {
-	if g.GameOver {
+	if g.GameOver || g.Paused {
 		return
 	}
 
@@ -100,13 +111,17 @@ func (g *Game) Step() {
 		g.endGame()
 		return
 	}
+	if g.Obstacles.Has(newHead) {
+		g.endGame()
+		return
+	}
 
 	ateFood := g.Food.EatenBy(newHead)
 	g.Snake.Advance(newHead, ateFood)
 
 	if ateFood {
 		g.Score += 10
-		g.Food.Spawn(g.Snake)
+		g.Food.Spawn(g.Snake, g.Obstacles)
 		g.updateSpeed()
 	}
 }

@@ -10,12 +10,12 @@ func NewFood() *Food {
 	return &Food{}
 }
 
-func (f *Food) Spawn(snake *Snake) {
+func (f *Food) Spawn(snake *Snake, obstacles Obstacles) {
 	empty := make([]Point, 0, MapWidth*MapHeight)
 	for y := 0; y < MapHeight; y++ {
 		for x := 0; x < MapWidth; x++ {
 			p := Point{X: x, Y: y}
-			if !snake.Occupies(p) {
+			if !snake.Occupies(p) && !obstacles.Has(p) {
 				empty = append(empty, p)
 			}
 		}
