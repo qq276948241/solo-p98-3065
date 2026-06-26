@@ -32,6 +32,10 @@ func (s *Snake) Head() Point {
 	return s.Body[0]
 }
 
+func (s *Snake) IsHead(p Point) bool {
+	return s.Body[0].X == p.X && s.Body[0].Y == p.Y
+}
+
 func (s *Snake) SetDirection(dir Direction) {
 	if (s.Direction == DirUp && dir == DirDown) ||
 		(s.Direction == DirDown && dir == DirUp) ||

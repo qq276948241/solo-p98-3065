@@ -27,15 +27,42 @@ type consoleScreenBufferInfo struct {
 	MaximumWindowSize coord
 }
 
+type CellSource interface {
+	GetCellContent(x, y int) string
+}
+
+type mapCellSource struct {
+	snake     *Snake
+	food      *Food
+	obstacles Obstacles
+}
+
+func (s *mapCellSource) GetCellContent(x, y int) string {
+	p := Point{X: x, Y: y}
+	if s.snake.IsHead(p) {
+		return "@"
+	}
+	if s.snake.Occupies(p) {
+		return "o"
+	}
+	if s.food.Pos.X == x && s.food.Pos.Y == y {
+		return "*"
+	}
+	if s.obstacles.Has(p) {
+		return "#"
+	}
+	return " "
+}
+
 const (
 	stdOutputHandle = ^uintptr(11) + 1
 )
 
 var (
-	procGetConsoleScreenBufferInfo = kernel32.NewProc("GetConsoleScreenBufferInfo")
-	procSetConsoleCursorPosition   = kernel32.NewProc("SetConsoleCursorPosition")
-	procFillConsoleOutputCharacterW = kernel32.NewProc("FillConsoleOutputCharacterW")
-	procFillConsoleOutputAttribute  = kernel32.NewProc("FillConsoleOutputAttribute")
+	procGetConsoleScreenBufferInfo    = kernel32.NewProc("GetConsoleScreenBufferInfo")
+	procSetConsoleCursorPosition      = kernel32.NewProc("SetConsoleCursorPosition")
+	procFillConsoleOutputCharacterW   = kernel32.NewProc("FillConsoleOutputCharacterW")
+	procFillConsoleOutputAttribute    = kernel32.NewProc("FillConsoleOutputAttribute")
 )
 
 var stdoutHandle uintptr
@@ -97,6 +124,11 @@ func WriteString(s string) {
 }
 
 func Render(snake *Snake, food *Food, obstacles Obstacles, score, highScore, speedLevel int, gameOver, paused bool) {
+	cells := &mapCellSource{snake: snake, food: food, obstacles: obstacles}
+	renderWithSource(cells, score, highScore, speedLevel, gameOver, paused)
+}
+
+func renderWithSource(cells CellSource, score, highScore, speedLevel int, gameOver, paused bool) {
 	MoveCursor(0, 0)
 
 	var sb strings.Builder
@@ -119,17 +151,7 @@ func Render(snake *Snake, food *Food, obstacles Obstacles, score, highScore, spe
 	for y := 0; y < MapHeight; y++ {
 		sb.WriteString("|")
 		for x := 0; x < MapWidth; x++ {
-			ch := " "
-			if x == snake.Head().X && y == snake.Head().Y {
-				ch = "@"
-			} else if snake.Occupies(Point{X: x, Y: y}) {
-				ch = "o"
-			} else if x == food.Pos.X && y == food.Pos.Y {
-				ch = "*"
-			} else if obstacles.Has(Point{X: x, Y: y}) {
-				ch = "#"
-			}
-			sb.WriteString(ch)
+			sb.WriteString(cells.GetCellContent(x, y))
 		}
 		sb.WriteString("|")
 
@@ -168,38 +190,44 @@ func Render(snake *Snake, food *Food, obstacles Obstacles, score, highScore, spe
 	sb.WriteString(topBorder)
 	sb.WriteString("   得分+10 / 食物\r\n")
 
-	if paused {
-		pausedLine := MapHeight/2 - 1
-		padding := (MapWidth - len(" PAUSED ")) / 2
-		overlay := make([]string, 0, 3)
-		overlay = append(overlay, strings.Repeat(" ", padding)+"╔════════╗")
-		overlay = append(overlay, strings.Repeat(" ", padding)+"║ PAUSED ║")
-		overlay = append(overlay, strings.Repeat(" ", padding)+"╚════════╝")
+	output := sb.String()
 
-		lines := strings.Split(sb.String(), "\r\n")
-		for i, line := range overlay {
-			targetLine := pausedLine + i + 1
-			if targetLine >= 0 && targetLine < len(lines) {
-				old := lines[targetLine]
-				if len(old) >= MapWidth+2 {
-					border := old[:1]
-					end := old[MapWidth+1 : MapWidth+2]
-					rightInfo := ""
-					if len(old) > MapWidth+2 {
-						rightInfo = old[MapWidth+2:]
-					}
-					inner := line
-					if len(inner) < MapWidth {
-						inner = inner + strings.Repeat(" ", MapWidth-len(inner))
-					} else if len(inner) > MapWidth {
-						inner = inner[:MapWidth]
-					}
-					lines[targetLine] = border + inner + end + rightInfo
+	if paused {
+		output = overlayPaused(output)
+	}
+
+	WriteString(output)
+}
+
+func overlayPaused(original string) string {
+	pausedLine := MapHeight/2 - 1
+	padding := (MapWidth - len(" PAUSED ")) / 2
+	overlay := make([]string, 0, 3)
+	overlay = append(overlay, strings.Repeat(" ", padding)+"╔════════╗")
+	overlay = append(overlay, strings.Repeat(" ", padding)+"║ PAUSED ║")
+	overlay = append(overlay, strings.Repeat(" ", padding)+"╚════════╝")
+
+	lines := strings.Split(original, "\r\n")
+	for i, line := range overlay {
+		targetLine := pausedLine + i + 1
+		if targetLine >= 0 && targetLine < len(lines) {
+			old := lines[targetLine]
+			if len(old) >= MapWidth+2 {
+				border := old[:1]
+				end := old[MapWidth+1 : MapWidth+2]
+				rightInfo := ""
+				if len(old) > MapWidth+2 {
+					rightInfo = old[MapWidth+2:]
 				}
+				inner := line
+				if len(inner) < MapWidth {
+					inner = inner + strings.Repeat(" ", MapWidth-len(inner))
+				} else if len(inner) > MapWidth {
+					inner = inner[:MapWidth]
+				}
+				lines[targetLine] = border + inner + end + rightInfo
 			}
 		}
-		WriteString(strings.Join(lines, "\r\n"))
-	} else {
-		WriteString(sb.String())
 	}
+	return strings.Join(lines, "\r\n")
 }

@@ -47,6 +47,32 @@ func NewGame() *Game {
 	return game
 }
 
+func (g *Game) IsGameOver() bool {
+	return g.GameOver
+}
+
+func (g *Game) IsPaused() bool {
+	return g.Paused
+}
+
+func (g *Game) IsActive() bool {
+	return !g.GameOver && !g.Paused
+}
+
+func (g *Game) CanChangeDirection() bool {
+	return !g.GameOver && !g.Paused
+}
+
+func (g *Game) CanTogglePause() bool {
+	return !g.GameOver
+}
+
+func (g *Game) TogglePause() {
+	if g.CanTogglePause() {
+		g.Paused = !g.Paused
+	}
+}
+
 func (g *Game) resetTicker() {
 	if g.Ticker != nil {
 		g.Ticker.Stop()
@@ -86,32 +112,22 @@ func (g *Game) HandleKey(e KeyEvent) {
 	case ActionRestart:
 		g.Restart()
 	case ActionPause:
-		if !g.GameOver {
-			g.Paused = !g.Paused
-		}
+		g.TogglePause()
 	case ActionDir:
-		if !g.GameOver && !g.Paused {
+		if g.CanChangeDirection() {
 			g.Snake.SetDirection(e.Direction)
 		}
 	}
 }
 
 func (g *Game) Step() {
-	if g.GameOver || g.Paused {
+	if !g.IsActive() {
 		return
 	}
 
 	newHead := g.Snake.Move()
 
-	if g.Snake.CollidesWall(newHead) {
-		g.endGame()
-		return
-	}
-	if g.Snake.CollidesSelf(newHead) {
-		g.endGame()
-		return
-	}
-	if g.Obstacles.Has(newHead) {
+	if g.checkCollision(newHead) {
 		g.endGame()
 		return
 	}
@@ -124,6 +140,10 @@ func (g *Game) Step() {
 		g.Food.Spawn(g.Snake, g.Obstacles)
 		g.updateSpeed()
 	}
+}
+
+func (g *Game) checkCollision(p Point) bool {
+	return g.Snake.CollidesWall(p) || g.Snake.CollidesSelf(p) || g.Obstacles.Has(p)
 }
 
 func (g *Game) endGame() {
@@ -140,4 +160,21 @@ func (g *Game) PollInput() {
 		}
 		g.HandleKey(e)
 	}
+}
+
+func (g *Game) GetCellContent(x, y int) string {
+	p := Point{X: x, Y: y}
+	if g.Snake.IsHead(p) {
+		return "@"
+	}
+	if g.Snake.Occupies(p) {
+		return "o"
+	}
+	if g.Food.Pos.X == x && g.Food.Pos.Y == y {
+		return "*"
+	}
+	if g.Obstacles.Has(p) {
+		return "#"
+	}
+	return " "
 }

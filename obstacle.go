@@ -2,24 +2,33 @@ package main
 
 import "math/rand"
 
-type Obstacles []Point
+type Obstacles struct {
+	points []Point
+	count  int
+}
 
 const (
-	minObstacles = 3
-	maxObstacles = 5
-	safetyRadius  = 2
+	obstacleMinCount  = 3
+	obstacleMaxCount  = 5
+	obstacleSafetyRad = 2
 )
 
 func NewObstacles(snake *Snake) Obstacles {
-	count := minObstacles + rand.Intn(maxObstacles-minObstacles+1)
-	obs := make(Obstacles, 0, count)
+	count := obstacleMinCount + rand.Intn(obstacleMaxCount-obstacleMinCount+1)
+	obs := Obstacles{
+		points: make([]Point, 0, count),
+		count:  count,
+	}
+	obs.generate(snake)
+	return obs
+}
 
+func (o *Obstacles) generate(snake *Snake) {
 	used := make(map[Point]bool)
 	for _, seg := range snake.Body {
 		used[seg] = true
 	}
-
-	for _, p := range snake.nearbyPoints(safetyRadius) {
+	for _, p := range nearbyPoints(snake.Body, obstacleSafetyRad) {
 		used[p] = true
 	}
 
@@ -37,15 +46,13 @@ func NewObstacles(snake *Snake) Obstacles {
 		candidates[i], candidates[j] = candidates[j], candidates[i]
 	})
 
-	for i := 0; i < count && i < len(candidates); i++ {
-		obs = append(obs, candidates[i])
+	for i := 0; i < o.count && i < len(candidates); i++ {
+		o.points = append(o.points, candidates[i])
 	}
-
-	return obs
 }
 
 func (o Obstacles) Has(p Point) bool {
-	for _, op := range o {
+	for _, op := range o.points {
 		if op.X == p.X && op.Y == p.Y {
 			return true
 		}
@@ -53,9 +60,19 @@ func (o Obstacles) Has(p Point) bool {
 	return false
 }
 
-func (s *Snake) nearbyPoints(radius int) []Point {
+func (o Obstacles) List() []Point {
+	res := make([]Point, len(o.points))
+	copy(res, o.points)
+	return res
+}
+
+func (o Obstacles) Count() int {
+	return len(o.points)
+}
+
+func nearbyPoints(body []Point, radius int) []Point {
 	res := make([]Point, 0)
-	for _, seg := range s.Body {
+	for _, seg := range body {
 		for dy := -radius; dy <= radius; dy++ {
 			for dx := -radius; dx <= radius; dx++ {
 				nx, ny := seg.X+dx, seg.Y+dy
